@@ -69,9 +69,6 @@ try:
             sector_names=[] #przechowuje nazwy sektorów
             now_occupied_places=[] #przechowuje ilosc zajmowanych miejsc w kazdym z sektorów
             with open('sector.txt') as f: #wczytuje z pliku info o sektorach i tworzy wiersze
-                #TODO dodać do pliku txt reszte sektorów,a tam gdzie nie ma być sektorów moze po prostu nazwe sektoru jako 00,
-                # czy coś w tym stylu? (myśle zeby dodac sektory mimo wszystko, zeby miec wspolrzedne poczatku i konca itp,
-                # i też w sumie nazywałam miejsca przy użyciu nazw sektorów, taki miałam na to pomysł)
                 while True:
                     line = f.readline()
                     if not line:
