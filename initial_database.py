@@ -109,7 +109,7 @@ try:
                 options = False, True
                 disability_value = random.choices(options, weights=(90, 10)) #disability_value = losowanie False /True z prawdopodobienstwem 0.9, że nie jest niepelnosprawny
                 location='NULL'
-                insert_values = (auto, location, bool(disability_value)) #TODO obczaić jak wstawiać boole do postgresa tak żeby faktycznie wstawialo sie True lub False
+                insert_values = (auto, location, disability_value[0])
                 cur.execute(insert_script, insert_values)
 
             # cur.execute('SELECT * FROM car')
@@ -138,24 +138,25 @@ try:
             cur.execute(create_script)
             insert_script = 'INSERT INTO place (sector_name, "ID_place", place_status, date_of_occupation, predicted_departure_time, occupying_car, charging_point, disability_adapted) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)'
             for sector_name in sector_names: #przechodzi przez wszystkie sektory
-                occupied=now_occupied_places.pop(0) #pobiera ilość aktualnie zajętych miejsc w danym sektorze
+                occupied = now_occupied_places.pop(0) #pobiera ilość aktualnie zajętych miejsc w danym sektorze
                 i = places_in_sector.pop(0) #pobiera ilosc miejsc w danym sektorze
                 for number in range(0,i): #przez wszystkie miejsca w sektorze
                     ID_place=sector_name+'P'+str(number+1)
                     place_status = 'free'
-                    occupying_car = 'NULL'
-                    date_of_occupation='2020-10-01 00:00:00-00' #TODO powstawiać sensowne timestampy jak to zrobić, żeby przyjmowało NULLa bo potrzebujemy tego gdy place jest free
-                    predicted_departure_time='2020-10-01 00:00:00-00' #TODO jak to zrobić, żeby przyjmowało NULLa gdy place jest free albo po prostu nie wiemy
+                    occupying_car = None
+                    date_of_occupation = None
+                    predicted_departure_time = None
                     options = False, True
-                    charging_point = random.choices(options, weights=(50, 50)) #TODO obczaić jak wstawiać boole do postgresa tak żeby faktycznie wstawialo sie True lub False
+                    charging_point = random.choices(options, weights=(50, 50))
                     disability_value = random.choices(options, weights=(90, 10))
                     if occupied > 0:
                         occupying_car=random.choice(ID_car)
                         occupied=occupied-1
                         ID_car.remove(occupying_car)
                         place_status = 'occupied'
-                        #TODO update wartości w tabeli car.location gdzie ID_car==occupying car bo tak jakby "parkujemy to auto"
-                    insert_values = (sector_name, ID_place, place_status, date_of_occupation, predicted_departure_time, occupying_car, bool(charging_point), bool(disability_value))
+                        update_script='''UPDATE CAR SET current_location=%s WHERE "ID_car"=%s'''
+                        cur.execute(update_script, (ID_place, occupying_car))
+                    insert_values = (sector_name, ID_place, place_status, date_of_occupation, predicted_departure_time, occupying_car, charging_point[0], disability_value[0])
                     cur.execute(insert_script, insert_values)
             cur.execute('SELECT * FROM place')
             # for record in cur.fetchall():
