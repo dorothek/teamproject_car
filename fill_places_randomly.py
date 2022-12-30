@@ -6,7 +6,7 @@ import string
 hostname = 'localhost'
 database = 'baza'
 username = 'postgres'
-pwd = 'Marsupilami7'
+pwd = '***'
 port_id = 5432
 conn = None
 
@@ -17,10 +17,6 @@ church = [15]
 main_road = [3,4,6,7,8,10]
 shops_nearby = [2,7,9,10,3,12]
 
-#nothing = [5,14]
-#supermarket = [2,7,9,10]
-#marketplace = [12]
-#mall = [3]
 
 def percent_of_places_taken(parking_nr,time_a_day, day):
     percent = 20
@@ -73,7 +69,6 @@ def date_of_arrival(arrival_time_ago, time):
     else:
         cur_min-=minutes
     cur_h-=hours
-
 
     today = str(date.today())
     date_of_arrival="{} {}:{}:00-00".format(today,cur_h,cur_min)
