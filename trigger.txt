@@ -1,0 +1,35 @@
+-- FUNCTION: public.update_place_trigger()
+
+-- DROP FUNCTION IF EXISTS public.update_place_trigger();
+
+CREATE OR REPLACE FUNCTION public.update_place_trigger()
+    RETURNS trigger
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE NOT LEAKPROOF
+AS $BODY$
+BEGIN
+UPDATE sector SET number_of_occupied_places=(SELECT COUNT(sector_name) FROM place WHERE place.sector_name=sector.sector_name AND place_status='occupied' GROUP BY sector_name);
+UPDATE parking SET number_of_occupied_places=(SELECT SUM(number_of_occupied_places) FROM sector WHERE parking."ID_parking"=sector."ID_parking" GROUP BY "ID_parking");
+RETURN NULL;
+END
+$BODY$;
+
+ALTER FUNCTION public.update_place_trigger()
+    OWNER TO postgres;
+
+
+
+
+-- Trigger: update_place_trigger
+
+-- DROP TRIGGER IF EXISTS update_place_trigger ON public.place;
+
+CREATE TRIGGER update_place_trigger
+    AFTER INSERT OR DELETE OR UPDATE OF place_status
+    ON public.place
+    FOR EACH ROW
+    EXECUTE FUNCTION public.update_place_trigger();
+
+COMMENT ON TRIGGER update_place_trigger ON public.place
+    IS 'counting and updating number of occupied places';
