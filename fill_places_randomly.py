@@ -1,12 +1,13 @@
 import psycopg2.extras
 import random
-from datetime import date
+from datetime import date, timedelta
+from datetime import datetime
 import string
 
 hostname = 'localhost'
 database = 'baza'
 username = 'postgres'
-pwd = '***'
+pwd = 'password'
 port_id = 5432
 conn = None
 
@@ -17,21 +18,32 @@ church = [15]
 main_road = [3,4,6,7,8,10]
 shops_nearby = [2,7,9,10,3,12]
 
+def clear_database(conn):
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+        cur.execute("""UPDATE place SET place_status='free', date_of_occupation=%s, predicted_departure_time=%s, occupying_car=%s""",(None,None,None))
+        cur.execute("""TRUNCATE car""")
+                     
+    conn.commit() 
+          
 
 def percent_of_places_taken(parking_nr,time_a_day, day):
-    percent = 20
+    percent = 30
     hour,minutes = time_a_day.split(':')
     predicted_departure_time = random.randint(5,100)
     time=int(hour) 
-    if parking_nr in church and day=="Sun" and (time==7 or time==10 or time==12 or time==16):
+    if time>8 and time<19:
+        percent+=10
+    if day==5 or day==6:
+        percent+=10
+    if parking_nr in church and day==6 and (time==7 or time==10 or time==12 or time==16):
         percent=70 
         predicted_departure_time = random.randint(15,60)
-    elif parking_nr in shops_nearby and day=="Sat" and time>6 and time<21:
+    elif parking_nr in shops_nearby and day==5 and time>6 and time<21:
         percent=75
         if time==12 or time==13:
             percent+=10
         predicted_departure_time = random.randint(1,150)
-    elif parking_nr in school and (day!="Sat" and day!="Sun"):
+    elif parking_nr in school and (day!=5 and day!=6):
         if time==8 or time==9:
             percent=65
         elif time==14 or time==15:
@@ -39,8 +51,8 @@ def percent_of_places_taken(parking_nr,time_a_day, day):
         predicted_departure_time = random.randint(1,30)
     elif parking_nr in hospital:
         percent+=20
-        predicted_departure_time=0
-        if day=="Sun" and time>14 and time<17:
+        predicted_departure_time=random.randint(60,600)
+        if day==6 and time>14 and time<17:
             percent=80
             predicted_departure_time = random.randint(4,120)
     if parking_nr in main_road and time>7 and time<20:
@@ -68,26 +80,35 @@ def date_of_arrival(arrival_time_ago, time):
         hours+=1
     else:
         cur_min-=minutes
-    cur_h-=hours
 
-    today = str(date.today())
-    date_of_arrival="{} {}:{}:00-00".format(today,cur_h,cur_min)
+    d = str(date.today())
+    if cur_h-hours<0:
+        cur_h=24-abs(cur_h-hours)
+        d=str(date.today()-timedelta(days=1))
+    else:   
+        cur_h-=hours      
+    date_of_arrival="{} {}:{}:00-00".format(d,cur_h,cur_min)
     return date_of_arrival
 
-def date_of_departure(departure_time, time):
+def date_of_departure(predicted_dep_time, time):
     hours = int(predicted_dep_time/60)
     minutes = int(predicted_dep_time%60)
-    h,min = current_time.split(':')
-    h,min=int(h),int(min)
-    if min+minutes>=60:
-        min+=minutes-60
+    
+    cur_h,cur_min = time.split(':')
+    cur_h,cur_min=int(cur_h),int(cur_min)
+    if cur_min+minutes>=60:
+        cur_min=cur_min+minutes-60
         hours+=1
     else:
-        min+=minutes
-        h+=hours
+        cur_min+=minutes
 
-    today = str(date.today())
-    departure_time="{} {}:{}:00-00".format(today,h,min)
+    d = str(date.today())
+    if cur_h+hours>=24:
+        cur_h=cur_h+hours-24
+        d=str(date.today()+timedelta(days=1))
+    else:
+        cur_h+=hours   
+    departure_time="{} {}:{}:00-00".format(d,cur_h,cur_min)
     return departure_time
 
 def random_ID(): 
@@ -103,10 +124,28 @@ try:
         port=port_id) as conn:
 
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            clear_database(conn)
+            current_time = "12:00"
+            day_of_week = 5
+            
+           # print("1. Decide the time and the day of the week")
+           # print("2. Get the today's date and time")
+           # print("Choice (1 or 2)")
+           # choice = input()
+            
+           # if choice=='1':
+           #     print("Day of the week (Mon=0, Tue=1, Wed=2, Thurs=3, Fri=4, Sat=5, Sun=6):")
+           #     day_of_week=int(input())
+           #     print("Time (hh:mm):")
+           #     current_time = input()
+           # if choice=='2':
+            dt = datetime.now()
+            day_of_week = dt.weekday()
+            current_time = dt.strftime("%H:%M")
+            
             cur.execute('SELECT "ID_parking", place.sector_name,"ID_place",charging_point,disability_adapted FROM place JOIN sector ON place.sector_name=sector.sector_name')
             for record in cur: 
-                current_time = "12:00"
-                day_of_week = "Sat"
+                
                 ID_car=[]
                 percent, predicted_dep_time = percent_of_places_taken(record[0],current_time, day_of_week) 
                 rand = random.randint(1,100)
@@ -118,8 +157,7 @@ try:
                     
                     arrival_time_ago = rand_arrival_time(predicted_dep_time)
                     rand_arrival_date = date_of_arrival(arrival_time_ago,current_time)
-                    cur_place.execute("""UPDATE place SET date_of_occupation=%s WHERE "ID_place"= %s""",(rand_arrival_date,record[2]))
-                    
+                    cur_place.execute("""UPDATE place SET date_of_occupation=%s WHERE "ID_place"= %s""",(rand_arrival_date,record[2]))                  
                     
                     if predicted_dep_time!=0:
                         command="""UPDATE place SET predicted_departure_time=%s WHERE "ID_place"= %s"""
@@ -138,18 +176,11 @@ try:
                     disability_value=False
                     if record[4]==True:
                         disability_value = True
-                    location='NULL'
+                        
                     insert_values = (auto, record[2], disability_value)
                     cur_place.execute("""UPDATE place SET occupying_car=%s WHERE "ID_place"= %s""",(auto,record[2]))
-                    #cur.execute("""INSERT INTO car ("ID_car", current_location, disability_adapted) VALUES (%s, %s, %s)"""",insert_values)
+                    cur_place.execute('INSERT INTO car ("ID_car", current_location, disability_adapted) VALUES (%s, %s, %s)',insert_values)
 
-                        
-                 else: #clear 
-                    cur_place.execute("""UPDATE place SET place_status='free' WHERE "ID_place"= %s""",[record[2]])
-                    cur_place.execute("""UPDATE place SET date_of_occupation=%s WHERE "ID_place"= %s""",(None,record[2]))
-                    cur_place.execute("""UPDATE place SET predicted_departure_time=%s WHERE "ID_place"= %s""",(None,record[2]))
-                    cur_place.execute("""UPDATE place SET occupying_car=%s WHERE "ID_place"= %s""",(None,record[2]))
-                    
     conn.commit() 
           
 except Exception as error:
