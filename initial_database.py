@@ -2,7 +2,8 @@ import psycopg2.extras
 import random
 import string
 
-#TODO trzeba wpisać swoje dane żeby się połączyć
+#firstly you have to create an empty PostgreSQL database (using pgAdmin)
+#after creating change the variable database and pwd to what you have set (and other information if needed)
 hostname = 'localhost'
 database = 'baza'
 username = 'postgres'
@@ -33,7 +34,7 @@ try:
                 )'''
             cur.execute(create_script)
             insert_script= 'INSERT INTO parking ("ID_parking", coordination, google_ID, number_of_places, number_of_occupied_places) VALUES (%s, %s, %s, %s, %s)'
-            with open('parkingi.txt') as f: #wczytuje z pliku i tworzy wiersze w tabeli
+            with open('parkingi.txt') as f: #loading data from file and creating rows in table parking
                 while True:
                     line = f.readline()
                     if not line:
@@ -65,10 +66,10 @@ try:
             cur.execute(create_script)
             insert_script = 'INSERT INTO sector ("ID_parking", sector_name, number_of_places, number_of_occupied_places, ' \
                             'parallel_or_perpendicular, start_of_sector_coordinates, end_of_sector_coordinates) VALUES (%s, %s, %s, %s, %s, %s, %s)'
-            places_in_sector=[] #przechowuje po kolei ilosc miejsc w kazdym sektorze
-            sector_names=[] #przechowuje nazwy sektorów
-            now_occupied_places=[] #przechowuje ilosc zajmowanych miejsc w kazdym z sektorów
-            with open('sector.txt') as f: #wczytuje z pliku info o sektorach i tworzy wiersze
+            places_in_sector=[] #stores number of places in each sector
+            sector_names=[] #stores sectors names
+            now_occupied_places=[] #stores number of occupied places in each sector
+            with open('sector.txt') as f: #loading from the file information about sectors and creating row for table sector
                 while True:
                     line = f.readline()
                     if not line:
@@ -95,19 +96,19 @@ try:
             cur.execute(create_script)
             insert_script = 'INSERT INTO car ("ID_car", current_location, disability_adapted) VALUES (%s, %s, %s)'
             car_marka = ['Toyota', 'Citroen', 'Peugeot', 'Renault', 'Kia', 'Honda', 'Hyundai', 'Audi', 'Volkswagen', 'BMW', 'Tesla']
-            ID_car=[] #przechowuje ID wszystkich samochodow
+            ID_car=[] #stored ID's of all cars
 
-            def random_ID(): #funkcja do tworzenia unikalnego ID samochodu
+            def random_ID(): #creating a unique car ID
                 letters = string.ascii_uppercase
                 return str(random.choice(car_marka)) + random.choice(letters) + random.choice(letters) + str(random.randrange(100, 1000, 3))
 
-            for i in range(0,sum(now_occupied_places)): #losuje/tworzy tyle aut ile jest aktualnie zajetych miejsc we wszystkich sektorach==parkingach
+            for i in range(0,sum(now_occupied_places)): #creating as many cars as there is occupied places in all sectors of all parkings
                 auto = random_ID()
-                while auto in ID_car: #walidacja czy juz takie ID istnieje, jeśli tak to jeszcze raz losuje
+                while auto in ID_car: #validation if the ID already exists
                     auto=random_ID()
                 ID_car.append(auto)
                 options = False, True
-                disability_value = random.choices(options, weights=(90, 10)) #disability_value = losowanie False /True z prawdopodobienstwem 0.9, że nie jest niepelnosprawny
+                disability_value = random.choices(options, weights=(90, 10)) #disability_value = False /True randomizer with probability 0.9 that is not disabled
                 location='NULL'
                 insert_values = (auto, location, disability_value[0])
                 cur.execute(insert_script, insert_values)
@@ -137,10 +138,10 @@ try:
                 )'''
             cur.execute(create_script)
             insert_script = 'INSERT INTO place (sector_name, "ID_place", place_status, date_of_occupation, predicted_departure_time, occupying_car, charging_point, disability_adapted) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)'
-            for sector_name in sector_names: #przechodzi przez wszystkie sektory
-                occupied = now_occupied_places.pop(0) #pobiera ilość aktualnie zajętych miejsc w danym sektorze
-                i = places_in_sector.pop(0) #pobiera ilosc miejsc w danym sektorze
-                for number in range(0,i): #przez wszystkie miejsca w sektorze
+            for sector_name in sector_names: #going through all sectors
+                occupied = now_occupied_places.pop(0) #getting current number of occupied places in the sector
+                i = places_in_sector.pop(0) #getting how many places in total are in the sector
+                for number in range(0,i): #going through all places in the sector
                     ID_place=sector_name+'P'+str(number+1)
                     place_status = 'free'
                     occupying_car = None
@@ -162,7 +163,7 @@ try:
             # for record in cur.fetchall():
             #     print(record)
 
-#################################dodanie klucza obcego do tabeli car########################################
+#################################adding foreign key to table car########################################
             create_script='''ALTER TABLE car ADD
                 CONSTRAINT car_current_location_fkey FOREIGN KEY (current_location)
                         REFERENCES public.place ("ID_place") MATCH SIMPLE
@@ -171,6 +172,38 @@ try:
                         NOT VALID'''
             cur.execute(create_script)
 ########################################################################################################################
+
+##################################################trigger##############################################################
+
+#function counting occupied places and updating tables sector and places
+            create_script=''' CREATE OR REPLACE FUNCTION public.count_occupied_places_function()
+                                RETURNS trigger
+                                LANGUAGE 'plpgsql'
+                                COST 100
+                                VOLATILE NOT LEAKPROOF
+                            AS $BODY$
+                            BEGIN
+                            UPDATE sector SET number_of_occupied_places=(SELECT COUNT(sector_name) FROM place WHERE place.sector_name=sector.sector_name AND place_status='occupied' GROUP BY sector_name);
+                            UPDATE parking SET number_of_occupied_places=(SELECT SUM(number_of_occupied_places) FROM sector WHERE parking."ID_parking"=sector."ID_parking" GROUP BY "ID_parking");
+                            RETURN NULL;
+                            END
+                            $BODY$;
+
+                            ALTER FUNCTION public.count_occupied_places_function()
+                                OWNER TO postgres;'''
+            cur.execute(create_script)
+
+
+#creating the trigger to execute function every time a place status is changed
+            create_script='''CREATE TRIGGER count_occupied_places_trigger
+                                AFTER INSERT OR DELETE OR UPDATE OF place_status
+                                ON public.place
+                                FOR EACH ROW
+                                EXECUTE FUNCTION public.count_occupied_places_function();'''
+            cur.execute(create_script)
+            
+################################################################################################################################
+
 
     conn.commit()
 except Exception as error:
