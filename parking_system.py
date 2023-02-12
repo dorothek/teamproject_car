@@ -11,8 +11,6 @@ import numpy as np
 
 conn = psycopg2.connect(dbname=init_db.database, user=init_db.username, password=init_db.pwd, host=init_db.hostname)
 
-#To-Do
-# Correct functions for charging_points condition
 
 class Parking_System:
 
@@ -75,14 +73,26 @@ class Parking_System:
                 places_from_sector = cur.fetchall()
                 cur.close()
                 if places_from_sector[0][0] > places_from_sector[0][1]:
+                    if check_for_charging_points:
+                        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+                        cur.execute(
+                            '''SELECT "ID_place" FROM Place WHERE EXISTS (SELECT charging_point, place_status, sector_name FROM Place WHERE sector_name=(%s) AND place_status='free' AND charging_point='t');''',
+                            (sector_name,))
+                        possible_places = cur.fetchall()
+                        cur.close()
+                        if possible_places is None:
+                            continue
                     print(f"[{self.ID_car}]In sector {current_sector_to_check} there is available spot")
                     sector_name = current_sector_to_check
                     break
                 else:
                     print(
                         f"[{self.ID_car}]In sector {current_sector_to_check} there is NO available spot. Searching in next one")
+            if check_for_charging_points:
+                ID_Place=self.find_space_on_chosen_parking_with_charging_spot(sector_name)
+            else:
+                ID_Place = self.find_space_on_chosen_parking(sector_name)
 
-            ID_Place = self.find_space_on_chosen_parking(sector_name)
             ID_nearest_car = self.find_nearest_parked_car(ID_Place)
             # 1 if you're first car
             if (ID_nearest_car != 1):
@@ -149,6 +159,15 @@ class Parking_System:
     def find_space_on_chosen_parking(self, sector_name: str) -> str:
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         cur.execute('''SELECT "ID_place" FROM Place WHERE Place.place_status='free' AND sector_name like  (%s)''',
+                    (sector_name,))
+        id_nearest_free_space = cur.fetchone()
+        cur.close()
+        print(f"[{self.ID_car}]This is your place {id_nearest_free_space[0]}")
+        return id_nearest_free_space[0]
+
+    def find_space_on_chosen_parking_with_charging_spot(self, sector_name: str) -> str:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur.execute('''SELECT "ID_place" FROM Place WHERE Place.place_status='free' AND charging_point='t' AND sector_name like '1sector3';''',
                     (sector_name,))
         id_nearest_free_space = cur.fetchone()
         cur.close()
