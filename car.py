@@ -41,7 +41,7 @@ class Car:
         else:
             destination = parking.find_closest_parking_with_free_space(False, self.location, parking)
         # reserving parking space
-        # parking.reserve_parking_spot(destination)
+        parking.reserve_parking_spot(destination[0])
 
     # car leaves parking space
     def leave_parking_spot(self, parking):

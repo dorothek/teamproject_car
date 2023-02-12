@@ -96,7 +96,7 @@ class Parking_System:
                     cur.close()
                 else:
                     init_no_space = False
-        self.reserve_parking_spot(ID_Place)
+
 
         # retrieve coordinates for Car
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -106,7 +106,11 @@ class Parking_System:
         coordinates_for_car = cur.fetchall()
         cur.close()
 
-        return coordinates_for_car[0]
+        result = []
+        result.append(ID_Place)
+        result.append(coordinates_for_car)
+
+        return result
 
     # checked
     def reserve_parking_spot(self, spot: str):
