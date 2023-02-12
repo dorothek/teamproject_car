@@ -11,21 +11,21 @@ pwd = 'password'
 port_id = 5432
 conn = None
 
-
+#parkings that are close to places that have a high influence on traffic
 school = [11,13]
-hospital =[1]
+hospital = [1]
 church = [15]
 main_road = [3,4,6,7,8,10]
 shops_nearby = [2,7,9,10,3,12]
 
-def clear_database(conn):
+def clear_database(conn): #clears table place and truncates table car
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
         cur.execute("""UPDATE place SET place_status='free', date_of_occupation=%s, predicted_departure_time=%s, occupying_car=%s""",(None,None,None))
         cur.execute("""TRUNCATE car""")
                      
     conn.commit() 
           
-
+#calculates percent of places taken and possible departure time of a car depending on where parking is located
 def percent_of_places_taken(parking_nr,time_a_day, day):
     percent = 30
     hour,minutes = time_a_day.split(':')
@@ -62,6 +62,7 @@ def percent_of_places_taken(parking_nr,time_a_day, day):
 
     return percent, predicted_departure_time  
 
+#returns random arrival time of a car
 def rand_arrival_time(predicted_departure_time):
     arrival_time_ago = 0
     if predicted_departure_time>100:
@@ -70,6 +71,7 @@ def rand_arrival_time(predicted_departure_time):
         arrival_time_ago = random.randint(10,100)
     return arrival_time_ago
 
+#calculates the date of car's arrival
 def date_of_arrival(arrival_time_ago, time):
     hours = int(arrival_time_ago/60)
     minutes = int(arrival_time_ago%60)
@@ -90,6 +92,7 @@ def date_of_arrival(arrival_time_ago, time):
     date_of_arrival="{} {}:{}:00-00".format(d,cur_h,cur_min)
     return date_of_arrival
 
+#calculates the date of car's departure 
 def date_of_departure(predicted_dep_time, time):
     hours = int(predicted_dep_time/60)
     minutes = int(predicted_dep_time%60)
@@ -111,6 +114,7 @@ def date_of_departure(predicted_dep_time, time):
     departure_time="{} {}:{}:00-00".format(d,cur_h,cur_min)
     return departure_time
 
+#returns a random ID of a car
 def random_ID(): 
     letters = string.ascii_uppercase
     return str(random.choice(car_marka)) + random.choice(letters) + random.choice(letters) + str(random.randrange(100, 1000, 3))
@@ -127,7 +131,7 @@ try:
             clear_database(conn)
             current_time = "12:00"
             day_of_week = 5
-            
+
            # print("1. Decide the time and the day of the week")
            # print("2. Get the today's date and time")
            # print("Choice (1 or 2)")
