@@ -3,17 +3,13 @@ import random
 from datetime import date, timedelta
 from datetime import datetime
 import string
+import initial_database
 
-hostname = 'localhost'
-database = 'baza'
-username = 'postgres'
-pwd = 'password'
-port_id = 5432
-conn = None
+conn = psycopg2.connect(dbname=initial_database.database, user=initial_database.username, password=initial_database.pwd)
 
-#parkings that are close to places that have a high influence on traffic
+#parkings that are close to places that have a high influence of traffic
 school = [11,13]
-hospital = [1]
+hospital =[1]
 church = [15]
 main_road = [3,4,6,7,8,10]
 shops_nearby = [2,7,9,10,3,12]
@@ -121,11 +117,11 @@ def random_ID():
 
 try:
     with psycopg2.connect(
-        host=hostname,
-        dbname=database,
-        user=username,
-        password=pwd,
-        port=port_id) as conn:
+        host=initial_database.hostname,
+        dbname=initial_database.database,
+        user=initial_database.username,
+        password=initial_database.pwd,
+        port=initial_database.port_id) as conn:
 
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
             clear_database(conn)
