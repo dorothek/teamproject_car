@@ -56,7 +56,7 @@ class Parking_System:
             # find sector of nearest_parking
             cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             cur.execute(
-                '''SELECT "sector_name" from sector WHERE "ID_parking" = (SELECT "ID_parking" FROM Parking WHERE coordination=(%s);''',
+                '''SELECT "sector_name" from sector WHERE "ID_parking" = (SELECT "ID_parking" FROM Parking WHERE coordination=(%s));''',
                 (coordinates_of_nearest_parking,))
             list_of_sectors = cur.fetchall()
             cur.close()
@@ -125,7 +125,7 @@ class Parking_System:
     # checked
     def reserve_parking_spot(self, spot: str):
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        cur.execute('''UPDATE place SET place_status='occupied' WHERE "ID_place"=(%s)''', (spot,))
+        cur.execute('''UPDATE place SET place_status='occupied', occupying_car=(%s) WHERE "ID_place"=(%s)''', (self.ID_car, spot,))
         print(f"[{self.ID_car}] Parking spot {spot} is reserved")
         conn.commit()
         cur.close()
@@ -174,11 +174,11 @@ class Parking_System:
         print(f"[{self.ID_car}]This is your place {id_nearest_free_space[0]}")
         return id_nearest_free_space[0]
 
-    def free_parking_spot(self):
+    def free_parking_spot(self, Id_car):
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         cur.execute('''UPDATE place SET place_status='free', occupying_car=NULL WHERE occupying_car=(%s)''',
-                    (self.ID_car,))
-        print(f"[{self.ID_car} left parking. This parking spot is free")
+                    (Id_car,))
+        print(f"[{Id_car} left parking. This parking spot is free")
         conn.commit()
         cur.close()
 

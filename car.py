@@ -37,15 +37,15 @@ class Car:
     def search_for_parking_spots(self, parking):
         # if there is low energy level searches for spaces with charging spots
         if self.energy_level <= 0.3:
-            destination = parking.find_closest_parking_with_free_space(True, self.location, parking)
+            destination = parking.find_closest_parking_with_free_space(True, self.location, self.ID_car)
         else:
-            destination = parking.find_closest_parking_with_free_space(False, self.location, parking)
+            destination = parking.find_closest_parking_with_free_space(False, self.location, self.ID_car)
         # reserving parking space
         parking.reserve_parking_spot(destination[0])
 
     # car leaves parking space
     def leave_parking_spot(self, parking):
-        parking.leave(self.ID_car)
+        parking.free_parking_spot(self.ID_car)
 
     # # reports parking location, to database, if parking unavailable starts search for another parking spot
     # def report_parked_location_car(self, parking):
