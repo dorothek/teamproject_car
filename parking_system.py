@@ -132,24 +132,33 @@ class Parking_System:
 
     # Checked
     # Finds ID of the nearest parked car (to double-check the surroundings)
+
+    #Sprawdz z lewej i prawej strony, jezeli nie ma zadnego samochodu, zwroc 1
     def find_nearest_parked_car(self, spot: str) -> str:
 
         if spot[len(spot) - 1] == 1:
             print(f"[{self.ID_car}] You are first car on this parking")
             return 1
+        elif 1:
+            change_spot = spot[len(spot) - 1]
+            change_spot = int(change_spot)
+            change_spot -= 1
+            change_spot = str(change_spot)
+            spot = spot[:-1] + change_spot
+            cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            cur.execute('''select occupying_car from place WHERE "ID_place"=(%s)''', (spot,))
+            id_nearest_parked_car = cur.fetchone()
+            cur.close()
+            return id_nearest_parked_car[0]
+            #Checking other side
 
-        change_spot = spot[len(spot) - 1]
-        change_spot = int(change_spot)
-        change_spot -= 1
-        change_spot = str(change_spot)
-        spot = spot[:-1] + change_spot
-        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        cur.execute('''select occupying_car from place WHERE "ID_place"=(%s)''', (spot,))
-        id_nearest_parked_car = cur.fetchone()
-        cur.close()
+        else:
+            print(f"[{self.ID_car}] There are no cars for checking your place. Please be careful, while parking")
+            return 1
         return id_nearest_parked_car[0]
 
-    # Waiting for main/start script
+    #Creating local object Car for checking the surrandings
+
     def ask_for_car_surroundings(self, nearest_parked_car) -> bool:
         if Car.ID_car == nearest_parked_car:
             state_of_surroundings = Car.get_surroundings()
