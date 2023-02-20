@@ -1,7 +1,7 @@
 import heapq
 from typing import List
 
-from flask import Flask, render_template, request, redirect, url_for, flash
+
 import psycopg2  # pip install psycopg2
 import psycopg2.extras
 import car
@@ -51,13 +51,13 @@ class Parking_System:
         for point in all_coordinates:
             list_of_all_coordinates.append(list(map(np.double, point[0].split(','))))
         while init_no_space:
-
+            print("Searching")
             coordinates_of_nearest_parking = self.find_closest_parking(list_of_all_coordinates, location)
 
             # find sector of nearest_parking
             cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             cur.execute(
-                 '''SELECT "sector_name" from sector WHERE "ID_parking" = (SELECT "ID_parking" FROM Parking WHERE coordination=(%s));''',
+                 '''SELECT "sector_name" from sector WHERE "ID_parking" = (SELECT "ID_parking" FROM Parking WHERE coordination=(%s) LIMIT 1);''',
                 (coordinates_of_nearest_parking,))
             list_of_sectors = cur.fetchall()
             cur.close()
@@ -73,6 +73,7 @@ class Parking_System:
                     (current_sector_to_check,))
                 places_from_sector = cur.fetchall()
                 cur.close()
+                print(f"Free places {places_from_sector[0][0]} Occupied places: {places_from_sector[0][1]}")
                 if places_from_sector[0][0] > places_from_sector[0][1]:
                     if check_for_charging_points:
                         cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -81,8 +82,13 @@ class Parking_System:
                             (sector_name,))
                         possible_places = cur.fetchall()
                         cur.close()
-                        if possible_places is None:
-                            continue
+                    else:
+                        cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+                        cur.execute(
+                            '''SELECT "ID_place" FROM Place WHERE EXISTS (SELECT place_status, sector_name FROM Place WHERE sector_name=(%s) AND place_status='free');''',
+                            (sector_name,))
+                        possible_places = cur.fetchall()
+                        cur.close()
                     print(f"[{self.ID_car}]In sector {current_sector_to_check} there is available spot")
                     sector_name = current_sector_to_check
                     break
@@ -95,19 +101,23 @@ class Parking_System:
                 ID_Place = self.find_space_on_chosen_parking(sector_name)
 
             ID_nearest_car = self.find_nearest_parked_car(ID_Place)
-            print('ID_nearest_car', ID_nearest_car)
+            # print('ID_nearest_car', ID_nearest_car)
             # 1 if you're first car
             if (ID_nearest_car != 1):
-                if self.ask_for_car_surroundings(ID_nearest_car) == False:
+                any_obstacles = self.ask_for_car_surroundings(ID_nearest_car)
+                if any_obstacles == False:
                     init_no_space = True
                     # If we know that this place is unavailable
-                    cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-                    cur.execute('''UPDATE place SET place_status='unavailable' WHERE "ID_place"=(%s)''', (ID_Place,))
                     print(f"[{self.ID_car}] Parking spot {ID_Place} is unavailable")
+                elif any_obstacles == True:
+                    cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+                    cur.execute('''UPDATE place SET place_status='free' WHERE "ID_place"=(%s)''', (ID_Place,))
+                    print(f"[{self.ID_car}] Parking spot {ID_Place} is okay to park")
                     self.conn.commit()
                     cur.close()
-                else:
                     init_no_space = False
+            elif (ID_nearest_car==1):
+                init_no_space=False
 
 
         # retrieve coordinates for Car
@@ -132,33 +142,63 @@ class Parking_System:
         self.conn.commit()
         cur.close()
 
+    def check_next_to_spot(self, spot:str, direction: int) -> str:
+        change_spot = spot[len(spot) - 1]
+        change_spot = int(change_spot)
+        if direction==1:
+            change_spot -= 1
+        else:
+            change_spot += 1
+        change_spot = str(change_spot)
+        spot = spot[:-1] + change_spot
+        print(f"[{self.ID_car}] Connecting to car on {spot}")
+        return spot
+
+    def check_if_there_is_car_next_to_parking_spot(self, id_car) -> bool:
+        if len(id_car)>1:
+            return False
+        elif not id_car:
+            return True
+        elif id_car is None:
+            return True
+        elif id_car[0] is None:
+            return True
+        elif id_car[0][0] is None:
+            return True
+        else:
+            return False
     # Checked
     # Finds ID of the nearest parked car (to double-check the surroundings)
     def find_nearest_parked_car(self, spot: str) -> str:
-
+        
         if spot[len(spot) - 1] == 1:
             print(f"[{self.ID_car}] You are first car on this parking")
             return 1
-
-        change_spot = spot[len(spot) - 1]
-        change_spot = int(change_spot)
-        change_spot -= 1
-        change_spot = str(change_spot)
-        spot = spot[:-1] + change_spot
-        cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        cur.execute('''select occupying_car from place WHERE "ID_place"=(%s)''', (spot,))
-        id_nearest_parked_car = cur.fetchone()
-        cur.close()
-
+        else:
+            spot = self.check_next_to_spot(spot, 1)
+            cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            cur.execute('''select occupying_car from place WHERE "ID_place"=(%s)''', (spot,))
+            id_nearest_parked_car = cur.fetchall()
+            cur.close()
+            if self.check_if_there_is_car_next_to_parking_spot(id_nearest_parked_car):
+                #Checking other side
+                spot = self.check_next_to_spot(spot, 2)
+                cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+                cur.execute('''select occupying_car from place WHERE "ID_place"=(%s)''', (spot,))
+                id_nearest_parked_car = cur.fetchall()
+                cur.close()
+        if self.check_if_there_is_car_next_to_parking_spot(id_nearest_parked_car):
+            print(f"[{self.ID_car}] There are no cars for checking your place. Please be careful, while parking")
+            return 1
         return id_nearest_parked_car[0]
 
     # Waiting for main/start script
     def ask_for_car_surroundings(self, nearest_parked_car) -> bool:
-        x = Car.get_ID(self)
         print('car', nearest_parked_car)
-        if Car.get_ID == nearest_parked_car:
-            state_of_surroundings = Car.get_surroundings()
-            return state_of_surroundings
+        nearest_parked_car_object = Car(True, nearest_parked_car)
+        state_of_surroundings = nearest_parked_car_object.get_surroundings()
+        print(f"[{self.ID_car}] State for surroundings of {nearest_parked_car}: {state_of_surroundings}")
+        return state_of_surroundings
 
     # Returns ID_place
     def find_space_on_chosen_parking(self, sector_name: str) -> str:
@@ -183,7 +223,7 @@ class Parking_System:
         cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         cur.execute('''UPDATE place SET place_status='free', occupying_car=NULL WHERE occupying_car=(%s)''',
                     (Id_car,))
-        print(f"[{Id_car} left parking. This parking spot is free")
+        print(f"[{Id_car}] {Id_car} left parking. This parking spot is free")
         self.conn.commit()
         cur.close()
 
