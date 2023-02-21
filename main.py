@@ -39,31 +39,45 @@ if __name__ == '__main__':
     # firstly you have to create an empty PostgreSQL database (using pgAdmin)
     # after creating change the variable database and pwd to what you have set (and other information if needed)
 
-    # initial_database.initDatabase(hostname, database, username, pwd, port_id, conn)
-
+    print("----------------------- Initializing Database -----------------------")
+    initial_database.initDatabase(hostname, database, username, pwd, port_id, conn)
+    print("----------------------- Database Initialized Successfully -----------------------")
     # ------------------------------------------------------------------------
     # fill db
 
-    # fill_places_randomly.fillPlacesRandomly(hostname, database, username, pwd, port_id, conn)
+    print("----------------------- Filling Database with cars -----------------------")
+    fill_places_randomly.fillPlacesRandomly(hostname, database, username, pwd, port_id, conn)
 
     # ------------------------------------------------------------------------
     # create db connection
 
+    print("----------------------- Connecting to database -----------------------")
     conn = psycopg2.connect(dbname=database, user=username, password=pwd, host=hostname)
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
     # get parked cars
+    print("----------------------- Creating Cars objects from the database -----------------------")
+    cur.execute("""SELECT "ID_car" FROM car ORDER BY RANDOM() LIMIT 30;""")
+    results = cur.fetchall()
+
+    parkedCars = [Car(True, result[0]) for result in results]
+    cur.close()
 
     # generate random moving cars
+    print("----------------------- Generating moving cars -----------------------")
     movingCars = list()
-    for i in range(10):
+    for i in range(30):
         movingCars.append(generateCar())
-    print(movingCars)
 
-    # create parking system
+    # # create parking system
 
+    print("----------------------- Connecting Parking System to database -----------------------")
     PS = Parking_System(conn)
 
-    # symulate few cars
+    # simple "dummy" symulation
+    print("----------------------- Beginning simulation -----------------------")
+    for i in range(30):
+        parkedCars[i].search_for_parking_spots(PS)
+        # movingCars[i].search_for_parking_spots(PS)
 
-    movingCars[0].search_for_parking_spots(PS)
-    movingCars[0].leave_parking_spot(PS)
+    conn.close()

@@ -12,6 +12,8 @@ In addition, the car closest to the reserved spot will verify whether the spot i
 This is the operating scheme for large parking lots. 
 We have assumed that if the parking lot is small (for example, the one by the local grocery store) then there is no need to store its scheme - in this case, data sufficient to identify a vacant space is the information about how many cars can park there on the average, and sensor readings.
 
-## Tech stack 
-
-Python 
+## How to run it?
+### To run the project follow steps below
+- Download files 
+- Create empty database in pgAdmin (name doesn't matter)
+- run main.py script

@@ -112,6 +112,10 @@ class Parking_System:
             if check_for_charging_points:
                 ID_Place=self.find_space_on_chosen_parking_with_charging_spot(sector_name)
             else:
+                if sector_name is not None:
+                    print(sector_name)
+                else:
+                    print("sector_name is None")
                 ID_Place = self.find_space_on_chosen_parking(sector_name)
 
             ID_nearest_car = self.find_nearest_parked_car(ID_Place)
