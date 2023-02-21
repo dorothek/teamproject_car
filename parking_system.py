@@ -30,9 +30,22 @@ class Parking_System:
             minHeap.append([dist, xp, yp])
         heapq.heapify(minHeap)
 
-        dist, x, y = heapq.heappop(minHeap)
-        res = [x, y]
-        str_res = str(res[0]) + "," + str(res[1])
+        #check if on this parking there are free space
+        for i in range(len(minHeap)):
+            dist, x, y = heapq.heappop(minHeap)
+            res = [x, y]
+            str_res = str(res[0]) + "," + str(res[1])
+            
+            cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            cur.execute('''SELECT "ID_parking" FROM Parking WHERE coordination=(%s) AND number_of_places>number_of_occupied_places; ''', (str_res,))
+            possible_parking = cur.fetchall()
+            cur.close()
+
+            if not possible_parking:
+                continue
+            else:
+                break
+        
         return str_res
 
     # Returns ID_parking !closes working
@@ -52,6 +65,7 @@ class Parking_System:
             list_of_all_coordinates.append(list(map(np.double, point[0].split(','))))
         while init_no_space:
             print("Searching")
+
             coordinates_of_nearest_parking = self.find_closest_parking(list_of_all_coordinates, location)
 
             # find sector of nearest_parking
