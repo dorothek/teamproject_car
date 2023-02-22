@@ -77,7 +77,10 @@ if __name__ == '__main__':
     # simple "dummy" symulation
     print("----------------------- Beginning simulation -----------------------")
     for i in range(30):
-        parkedCars[i].search_for_parking_spots(PS)
-        # movingCars[i].search_for_parking_spots(PS)
+        print("----------------------- New car looking for a parking place -----------------------")
+        movingCars[i].search_for_parking_spots(PS)
+        print("----------------------- Car leaving the parking -----------------------")
+        parkedCars[i].leave_parking_spot(PS)
+
 
     conn.close()
