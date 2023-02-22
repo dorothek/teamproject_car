@@ -24,14 +24,14 @@ def generateCar():
 
 if __name__ == '__main__':
     # get password and db name
-    # databaseName = input('Database name: ')
-    # PWD = input('Database password: ')
+    databaseName = input('Database name: ')
+    PWD = input('Database password: ')
     # ------------------------------------------------------------------------
     # DB DATA
     hostname = 'localhost'
-    database = 'teamproject_car'
+    database = databaseName
     username = 'postgres'
-    pwd = 'Czemuja?1'
+    pwd = PWD
     port_id = 5432
     conn = None
     # ------------------------------------------------------------------------
