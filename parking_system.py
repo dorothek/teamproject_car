@@ -20,7 +20,7 @@ class Parking_System:
         self.conn = conn
 
     # from list of coordinates of parking, it finds the closest parking
-    def find_closest_parking(self, points: List[List[np.longdouble]], current_point: List[np.longdouble]) -> List[
+    def find_closest_parking(self, points: List[List[np.longdouble]], current_point: List[np.longdouble], charging_point) -> List[
         List[np.longdouble]]:
         minHeap = []
         for xp, yp in points:
@@ -34,13 +34,19 @@ class Parking_System:
         for i in range(len(minHeap)):
             dist, x, y = heapq.heappop(minHeap)
             res = [x, y]
-            str_res = str(res[0]) + "," + str(res[1])
+            str_res = str(res[0]) + ", " + str(res[1])
             
-            cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-            cur.execute('''SELECT "ID_parking" FROM Parking WHERE coordination=(%s) AND number_of_places>number_of_occupied_places; ''', (str_res,))
-            possible_parking = cur.fetchall()
-            cur.close()
-
+            if charging_point:
+                cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+                cur.execute('''SELECT "ID_parking" FROM Parking WHERE coordination=(%s) AND number_of_places>number_of_occupied_places; ''', (str_res,))
+                possible_parking = cur.fetchall()
+                cur.close()
+            else:
+                cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+                cur.execute('''SELECT "ID_parking" FROM Parking WHERE coordination=(%s) AND number_of_places>number_of_occupied_places; ''', (str_res,))
+                possible_parking = cur.fetchall()
+                cur.close()
+            
             if not possible_parking:
                 continue
             else:
@@ -64,10 +70,9 @@ class Parking_System:
         for point in all_coordinates:
             list_of_all_coordinates.append(list(map(np.double, point[0].split(','))))
         while init_no_space:
-            print("Searching")
-
-            coordinates_of_nearest_parking = self.find_closest_parking(list_of_all_coordinates, location)
-
+            print(f"[{self.ID_car}] Searching")
+            coordinates_of_nearest_parking = self.find_closest_parking(list_of_all_coordinates, location, check_for_charging_points)
+            #print(coordinates_of_nearest_parking)
             # find sector of nearest_parking
             cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             cur.execute(
@@ -77,6 +82,7 @@ class Parking_System:
             cur.close()
 
             sector_name = ' '
+            
             # check if in this sector there is free space, if isn't check the next one
             for sector in list_of_sectors:
                 # retrieving sector name in format '1sector1'
@@ -87,25 +93,33 @@ class Parking_System:
                     (current_sector_to_check,))
                 places_from_sector = cur.fetchall()
                 cur.close()
+                
                 print(f"Free places {places_from_sector[0][0]} Occupied places: {places_from_sector[0][1]}")
                 if places_from_sector[0][0] > places_from_sector[0][1]:
+                    #print(check_for_charging_points)
                     if check_for_charging_points:
                         cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
                         cur.execute(
-                            '''SELECT "ID_place" FROM Place WHERE EXISTS (SELECT charging_point, place_status, sector_name FROM Place WHERE sector_name=(%s) AND place_status='free' AND charging_point='t');''',
-                            (sector_name,))
+                            '''SELECT "ID_place" FROM Place WHERE sector_name=(%s) AND place_status='free' AND charging_point='t' LIMIT 1;''',
+                            (current_sector_to_check,))
                         possible_places = cur.fetchall()
                         cur.close()
                     else:
                         cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
                         cur.execute(
-                            '''SELECT "ID_place" FROM Place WHERE EXISTS (SELECT place_status, sector_name FROM Place WHERE sector_name=(%s) AND place_status='free');''',
-                            (sector_name,))
+                            '''SELECT "ID_place" FROM Place WHERE sector_name=(%s) AND place_status='free' LIMIT 1;''',
+                            (current_sector_to_check,))
                         possible_places = cur.fetchall()
                         cur.close()
-                    print(f"[{self.ID_car}]In sector {current_sector_to_check} there is available spot")
-                    sector_name = current_sector_to_check
-                    break
+                    
+                    if not possible_places:
+                        # print(possible_places, sector)
+                        # print("Blob")
+                        continue
+                    else:
+                        print(f"[{self.ID_car}]In sector {current_sector_to_check} there is available spot")
+                        sector_name = current_sector_to_check
+                        break
                 else:
                     print(
                         f"[{self.ID_car}]In sector {current_sector_to_check} there is NO available spot. Searching in next one")
@@ -230,7 +244,7 @@ class Parking_System:
 
     def find_space_on_chosen_parking_with_charging_spot(self, sector_name: str) -> str:
         cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        cur.execute('''SELECT "ID_place" FROM Place WHERE Place.place_status='free' AND charging_point='t' AND sector_name like '1sector3';''',
+        cur.execute('''SELECT "ID_place" FROM Place WHERE Place.place_status='free' AND charging_point='t' AND sector_name like (%s);''',
                     (sector_name,))
         id_nearest_free_space = cur.fetchone()
         cur.close()
