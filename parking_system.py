@@ -38,7 +38,7 @@ class Parking_System:
             
             if charging_point:
                 cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-                cur.execute('''SELECT "ID_parking" FROM Parking WHERE coordination=(%s) AND number_of_places>number_of_occupied_places; ''', (str_res,))
+                cur.execute('''SELECT parking."ID_parking" FROM parking JOIN sector ON parking."ID_parking"=sector."ID_parking" JOIN place ON sector.sector_name=place.sector_name WHERE coordination=(%s) AND charging_point='true' AND place_status='free' GROUP BY parking."ID_parking" HAVING COUNT(charging_point)>0;''', (str_res,))
                 possible_parking = cur.fetchall()
                 cur.close()
             else:
